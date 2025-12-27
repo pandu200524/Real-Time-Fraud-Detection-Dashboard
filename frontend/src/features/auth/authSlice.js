@@ -1,123 +1,94 @@
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import axios from 'axios';
 
-const app = express();
+// Direct Render URL
+const API_URL = 'https://real-time-fraud-detection-dashboard.onrender.com';
 
-// SIMPLE CORS FIX - Allow all origins
-app.use(cors({
-  origin: '*', // Allow ALL origins
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
-}));
-
-// Handle preflight requests for ALL routes
-app.options('*', cors());
-
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/fraud-detection';
-
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => {
-  console.log('MongoDB Connected Successfully');
-})
-.catch((err) => {
-  console.error('MongoDB Connection Error:', err.message);
-});
-
-// CORS Test Endpoint
-app.get('/api/cors-test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'CORS is working!',
-    timestamp: new Date().toISOString(),
-    origin: req.headers.origin || 'No origin header',
-    server: 'Render Backend',
-    cors: 'enabled'
-  });
-});
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Fraud Detection API',
-    version: '1.0.0',
-    status: 'online',
-    cors: 'enabled',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      health: '/health',
-      corsTest: '/api/cors-test',
-      auth: {
-        login: 'POST /api/auth/login',
-        register: 'POST /api/auth/register'
-      }
+export const login = createAsyncThunk(
+  'auth/login',
+  async ({ email, password }, { rejectWithValue }) => {
+    try {
+      // SIMPLE axios call - no special headers
+      const response = await axios.post(
+        `${API_URL}/api/auth/login`,
+        { email, password },
+        {
+          headers: { 'Content-Type': 'application/json' }
+          // NO withCredentials
+        }
+      );
+      
+      const { token, user } = response.data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return { token, user };
+    } catch (error) {
+      console.error('Login error:', error);
+      return rejectWithValue(error.response?.data?.error || 'Login failed');
     }
-  });
+  }
+);
+
+export const logout = createAsyncThunk('auth/logout', async () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  return null;
 });
 
-// Health check
-app.get('/health', (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    database: dbStatus,
-    cors: 'enabled'
-  });
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: {
+    user: JSON.parse(localStorage.getItem('user')) || null,
+    token: localStorage.getItem('token') || null,
+    isAuthenticated: !!localStorage.getItem('token'),
+    loading: false,
+    error: null,
+  },
+  reducers: {
+    clearError: (state) => { state.error = null; },
+    setUser: (state, action) => {
+      state.user = action.payload;
+      state.isAuthenticated = true;
+    },
+    clearCredentials: (state) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(login.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(login.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.error = null;
+      })
+      .addCase(login.rejected, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = false;
+        state.user = null;
+        state.token = null;
+        state.error = action.payload || 'Login failed';
+      })
+      .addCase(logout.fulfilled, (state) => {
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.loading = false;
+        state.error = null;
+      });
+  },
 });
 
-// API Routes
-try {
-  const authRoutes = require('./src/routes/auth.routes');
-  const transactionRoutes = require('./src/routes/transaction.routes');
-  
-  app.use('/api/auth', authRoutes);
-  app.use('/api/transactions', transactionRoutes);
-  
-  console.log('API routes loaded successfully');
-} catch (error) {
-  console.error('Error loading routes:', error.message);
-}
-
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Endpoint not found',
-    path: req.path,
-    method: req.method
-  });
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Server error:', err.message);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
-  });
-});
-
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log('='.repeat(60));
-  console.log('Fraud Detection API Server Started');
-  console.log('='.repeat(60));
-  console.log(`Server URL: http://localhost:${PORT}`);
-  console.log(`Live URL: https://real-time-fraud-detection-dashboard.onrender.com`);
-  console.log(`CORS: Enabled (all origins allowed)`);
-  console.log('='.repeat(60));
-  console.log('\nTest the API:');
-  console.log(`  curl https://real-time-fraud-detection-dashboard.onrender.com/api/cors-test`);
-  console.log('='.repeat(60));
-});
-
-module.exports = app;
+export const { clearError, setUser, clearCredentials } = authSlice.actions;
+export default authSlice.reducer;
