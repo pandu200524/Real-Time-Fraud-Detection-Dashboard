@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card, Spinner } from 'react-bootstrap';
 import { Line, Bar } from 'react-chartjs-2';
 import {
@@ -29,7 +29,6 @@ ChartJS.register(
 );
 
 const RiskChart = () => {
-  const chartRef = useRef(null);
   const { stats, loading } = useSelector((state) => state.transactions);
 
   // ALWAYS use backend stats - never compute from local transactions
@@ -56,26 +55,6 @@ const RiskChart = () => {
       avgRisk: 0
     }));
   }, [stats.hourlyPattern]);
-
-  
-  useEffect(() => {
-  let chartInstance = null;
-
-  if (chartRef.current) {
-    chartInstance = new Chart(chartRef.current, {
-      type: 'line',
-      data: chartData,
-      options: chartOptions,
-    });
-  }
-
-  return () => {
-    if (chartInstance) {
-      chartInstance.destroy();
-    }
-  };
-}, [chartData]);
-
 
   // Risk Distribution Data
   const riskData = {
