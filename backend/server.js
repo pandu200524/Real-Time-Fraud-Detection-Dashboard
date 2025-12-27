@@ -14,7 +14,7 @@ const app = express();
 
 const corsOptions = {
   origin: [
-    'https://real-time-fraud-detection-dashboard-fc9vc6gkt.vercel.app/',   
+    'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app/',   
     'http://localhost:3000',
     'http://localhost:3001'
   ],
