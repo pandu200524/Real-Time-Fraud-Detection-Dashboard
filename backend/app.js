@@ -55,7 +55,7 @@ try {
   app.use("/api/auth", require("./src/routes/auth.routes"));
   app.use("/api/transactions", require("./src/routes/transaction.routes"));
 } catch (error) {
-  console.log("⚠️ Warning: Some routes could not be loaded:", error.message);
+  console.log(" Warning: Some routes could not be loaded:", error.message);
 }
 
 // Fallback route for missing endpoints
