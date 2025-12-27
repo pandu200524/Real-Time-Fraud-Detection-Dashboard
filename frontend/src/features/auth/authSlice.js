@@ -13,8 +13,7 @@ export const login = createAsyncThunk(
       }, {
         headers: {
           'Content-Type': 'application/json'
-        },
-        withCredentials: true
+        }
       });
       
       const { token, user } = response.data;
