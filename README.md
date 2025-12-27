@@ -1,6 +1,6 @@
 # FraudShield AI - Real-Time Fraud Detection Dashboard
 
-A real-time e-commerce transaction monitoring system with AI-powered fraud detection using OpenAI, built with React,Express.js, Node.js, and MongoDB.
+A real-time e-commerce transaction monitoring system with AI-powered fraud detection using OpenAI, built with React, Express.js, Node.js, and MongoDB.
 
 ## Overview
 
@@ -118,7 +118,7 @@ fraud-detection-dashboard/
    ```
 
 3. Create .env file in backend directory
-   ```env
+   ```
    PORT=5000
    MONGODB_URI=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/fraud_dashboard?retryWrites=true&w=majority
    JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
@@ -133,13 +133,13 @@ fraud-detection-dashboard/
    ```
 
 5. Create .env file in frontend directory
-   ```env
+   ```
    REACT_APP_API_URL=http://localhost:5000
    REACT_APP_WS_URL=ws://localhost:5000
    ```
 
 6. Start the application
-   
+
    Terminal 1 - Backend:
    ```bash
    cd backend
@@ -160,7 +160,7 @@ fraud-detection-dashboard/
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/fraud-detection-dashboard.git
+   git clone https://github.com/pandu200524/Real-Time-Fraud-Detection-Dashboard.git
    cd fraud-detection-dashboard
    ```
 
@@ -281,7 +281,7 @@ Viewer Account
 ### Environment Variables
 
 Backend (.env)
-```env
+```
 PORT=5000                          # API server port
 MONGODB_URI=mongodb+srv://...      # MongoDB connection string
 JWT_SECRET=your-secret-key         # JWT signing key
@@ -290,7 +290,7 @@ NODE_ENV=development               # Environment mode
 ```
 
 Frontend (.env)
-```env
+```
 REACT_APP_API_URL=http://localhost:5000    # Backend API URL
 REACT_APP_WS_URL=ws://localhost:5000       # WebSocket URL
 ```
@@ -320,32 +320,33 @@ await this.cleanupOldTransactions(100); // keep latest 100
 ### Common Issues
 
 1. Backend won't start - "Port already in use"
-```bash
-# Windows
-taskkill /IM node.exe /F
+   ```bash
+   # Windows
+   taskkill /IM node.exe /F
 
-
-```
+   # Mac/Linux
+   pkill node
+   ```
 
 2. MongoDB connection error
-- Verify MongoDB Atlas IP whitelist (allow 0.0.0.0/0 for development)
-- Check connection string format
-- Ensure database user has read/write permissions
+   - Verify MongoDB Atlas IP whitelist (allow 0.0.0.0/0 for development)
+   - Check connection string format
+   - Ensure database user has read/write permissions
 
 3. Frontend can't connect to backend
-- Verify backend is running on port 5000
-- Check CORS settings in backend
-- Verify .env file URLs are correct
+   - Verify backend is running on port 5000
+   - Check CORS settings in backend
+   - Verify .env file URLs are correct
 
 4. WebSocket disconnects frequently
-- Check network stability
-- Verify Socket.io versions match (client & server)
-- Check browser console for errors
+   - Check network stability
+   - Verify Socket.io versions match (client & server)
+   - Check browser console for errors
 
 5. OpenAI API errors
-- Verify API key is valid
-- Check OpenAI account has credits
-- Review API rate limits
+   - Verify API key is valid
+   - Check OpenAI account has credits
+   - Review API rate limits
 
 ## Performance
 
@@ -381,8 +382,8 @@ Current Security Features:
 
 ### Recommended Hosting
 
-- Frontend: Vercel, Netlify, or AWS S3 + CloudFront
-- Backend: Heroku, Railway, AWS EC2, or DigitalOcean
+- Frontend: Vercel, Netlify
+- Backend:  Render,Railway
 - Database: MongoDB Atlas (already cloud-based)
 
 ### Production Checklist
@@ -427,8 +428,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Author
 
 Revanth Vangapandu
-- GitHub: [pandu20024](https://github.com/pandu200524)
-- LinkedIn: [Revanth Vangapandu](https://www.linkedin.com/in/revanth-vangapandu-4355511a7/)
+- GitHub: https://github.com/pandu200524
+- LinkedIn: https://www.linkedin.com/in/revanth-vangapandu-4355511a7/
 
 ## Acknowledgments
 
