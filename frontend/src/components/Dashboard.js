@@ -15,7 +15,13 @@ const Dashboard = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { error } = useSelector((state) => state.transactions);
-  useSelector((state) => state.transactions);
+
+{error && (
+  <div className="alert alert-danger">
+    {error}
+  </div>
+)}
+
   
   // Initialize WebSocket connection
   useWebSocket();
