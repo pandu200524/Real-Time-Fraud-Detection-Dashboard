@@ -11,11 +11,10 @@ const { initSocket, setFraudService } = require('./src/sockets/socket');
 // Create Express app
 const app = express();
 
-// Configure CORS - UPDATE THIS WITH YOUR ACTUAL VERCEL URL!
+
 const corsOptions = {
   origin: [
-    'https://your-project.vercel.app',  
-    'https://fraud-detection-dashboard.vercel.app', 
+    'https://real-time-fraud-detection-dashboard-fc9vc6gkt.vercel.app/',   
     'http://localhost:3000',
     'http://localhost:3001'
   ],
