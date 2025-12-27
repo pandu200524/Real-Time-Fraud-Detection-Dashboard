@@ -14,7 +14,7 @@ import { FaSync, FaExclamationTriangle } from 'react-icons/fa';
 const Dashboard = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const { loading, error } = useSelector((state) => state.transactions);
+  const { error } = useSelector((state) => state.transactions);
   
   // Initialize WebSocket connection
   useWebSocket();
