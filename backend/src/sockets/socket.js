@@ -4,15 +4,23 @@ let io;
 let fraudService = null;
 
 const initSocket = (server) => {
-  // Create Socket.IO server with CORS
+  // Create Socket.IO server with CORS for Vercel
   io = new Server(server, {
     cors: {
-      origin: ['http://localhost:3000', 'http://localhost:3001'],
+      origin: [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app',
+        /\.vercel\.app$/ // Allow all Vercel preview deployments
+      ],
       methods: ['GET', 'POST'],
-      credentials: true
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization']
     },
     transports: ['websocket', 'polling'],
-    path: '/socket.io'
+    path: '/socket.io',
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
   // Store globally
@@ -37,7 +45,7 @@ const initSocket = (server) => {
       // Stop generation if no clients connected
       if (io.engine.clientsCount === 0 && fraudService) {
         fraudService.stopTransactionGeneration();
-        console.log(' Transaction generation stopped (no clients)');
+        console.log('💤 Transaction generation stopped (no clients)');
       }
     });
 
@@ -52,9 +60,14 @@ const initSocket = (server) => {
         }
       }
     });
+
+    // Handle connection errors
+    socket.on('error', (error) => {
+      console.error('Socket error:', error);
+    });
   });
 
-  console.log(' Socket.IO initialized');
+  console.log(' Socket.IO initialized with CORS');
   return io;
 };
 
