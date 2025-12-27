@@ -57,7 +57,7 @@ const RiskChart = () => {
     }));
   }, [stats.hourlyPattern]);
 
-  // FIXED: Store ref value for cleanup
+  
   useEffect(() => {
     const currentChartRef = chartRef.current;
     
