@@ -1,15 +1,26 @@
-﻿const express = require("express");
+const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
 
 const app = express();
 
-// Middleware
+// CORS Configuration - Allow Vercel frontend
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
-  credentials: true
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app',
+    /\.vercel\.app$/ // Allow all Vercel deployments
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 
 // MongoDB Connection
@@ -44,7 +55,7 @@ try {
   app.use("/api/auth", require("./src/routes/auth.routes"));
   app.use("/api/transactions", require("./src/routes/transaction.routes"));
 } catch (error) {
-  console.log(" Warning: Some routes could not be loaded:", error.message);
+  console.log("⚠️ Warning: Some routes could not be loaded:", error.message);
 }
 
 // Fallback route for missing endpoints
