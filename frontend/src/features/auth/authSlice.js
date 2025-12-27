@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://real-time-fraud-detection-dashboard.onrender.com';
 
 export const login = createAsyncThunk(
   'auth/login',
@@ -12,23 +12,28 @@ export const login = createAsyncThunk(
         password,
       }, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        withCredentials: true, // ADD THIS LINE - CRITICAL FOR CORS
+        withCredentials: true, // CRITICAL FOR CORS
       });
       
       const { token, user } = response.data;
       
       // Store in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+      if (user) {
+        localStorage.setItem('user', JSON.stringify(user));
+      }
       
       return { token, user };
     } catch (error) {
       console.error('Login error:', error);
       
       if (error.response) {
-        return rejectWithValue(error.response.data.error || 'Login failed. Please check credentials.');
+        return rejectWithValue(error.response.data.message || error.response.data.error || 'Login failed. Please check credentials.');
       } else if (error.request) {
         return rejectWithValue('Cannot connect to server. Please check your connection.');
       } else {
