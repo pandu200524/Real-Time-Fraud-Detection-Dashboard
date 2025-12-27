@@ -151,7 +151,7 @@ app.options('/api/cors-test', (req, res) => {
 // Import and use your routes
 const authRoutes = require('./src/routes/auth.routes');
 const transactionRoutes = require('./src/routes/transaction.routes');
-const dashboardRoutes = require('./src/routes/dashboard.routes');
+
 
 // Handle preflight for all auth routes
 app.options('/api/auth/*', (req, res) => {
@@ -162,7 +162,7 @@ app.options('/api/auth/*', (req, res) => {
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
