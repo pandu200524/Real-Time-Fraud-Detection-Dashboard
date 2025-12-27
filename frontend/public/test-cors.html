@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>CORS Test Page</h1>
+    
+    <button onclick="testCors()">Test CORS</button>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="testOptions()">Test OPTIONS</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        const API_URL = 'https://real-time-fraud-detection-dashboard.onrender.com';
+        
+        async function testCors() {
+            try {
+                const response = await fetch(API_URL + '/api/cors-test');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `Error: ${error.message}`;
+            }
+        }
+        
+        async function testLogin() {
+            try {
+                const response = await fetch(API_URL + '/api/auth/test-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'test@test.com',
+                        password: 'password123'
+                    })
+                });
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `Error: ${error.message}`;
+            }
+        }
+        
+        async function testOptions() {
+            try {
+                const response = await fetch(API_URL + '/api/auth/login', {
+                    method: 'OPTIONS'
+                });
+                document.getElementById('result').innerHTML = 
+                    `OPTIONS Status: ${response.status} ${response.statusText}`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
