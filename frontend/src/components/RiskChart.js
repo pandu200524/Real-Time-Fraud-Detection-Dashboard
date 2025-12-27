@@ -59,14 +59,23 @@ const RiskChart = () => {
 
   
   useEffect(() => {
-    const currentChartRef = chartRef.current;
-    
-    return () => {
-      if (currentChartRef) {
-        currentChartRef.destroy();
-      }
-    };
-  }, []);
+  let chartInstance = null;
+
+  if (chartRef.current) {
+    chartInstance = new Chart(chartRef.current, {
+      type: 'line',
+      data: chartData,
+      options: chartOptions,
+    });
+  }
+
+  return () => {
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+  };
+}, [chartData]);
+
 
   // Risk Distribution Data
   const riskData = {
