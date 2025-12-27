@@ -2,8 +2,8 @@ import React from 'react';
 import { Card, Button, Badge, ListGroup } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearAlerts, removeAlert } from '../features/transactions/transactionSlice';
-import { FaBell, FaExclamationTriangle, FaTimes, FaEye, FaHistory } from 'react-icons/fa';
-import { markAsReviewed } from '../features/transactions/transactionSlice';
+import { FaBell, FaExclamationTriangle, FaTimes } from 'react-icons/fa';
+
 
 
 export default AlertsPanel;
