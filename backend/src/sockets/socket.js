@@ -4,15 +4,24 @@ let io;
 let fraudService = null;
 
 const initSocket = (server) => {
-  // Create Socket.IO server with CORS for Vercel
   io = new Server(server, {
     cors: {
-      origin: [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app',
-        /\.vercel\.app$/ // Allow all Vercel preview deployments
-      ],
+      origin: function(origin, callback) {
+        if (!origin) return callback(null, true);
+        
+        const allowedOrigins = [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app'
+        ];
+        
+        if (allowedOrigins.includes(origin) || (origin && origin.endsWith('.vercel.app'))) {
+          callback(null, true);
+        } else {
+          console.log('WebSocket blocked by CORS:', origin);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       methods: ['GET', 'POST'],
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization']
@@ -23,33 +32,29 @@ const initSocket = (server) => {
     pingInterval: 25000
   });
 
-  // Store globally
   global.io = io;
 
   io.on('connection', (socket) => {
-    console.log(' Client connected:', socket.id);
+    console.log('Client connected:', socket.id);
 
     socket.emit('welcome', {
       message: 'Connected to Fraud Detection WebSocket',
     });
 
-    // Start transaction generation when a client connects
     if (fraudService && !fraudService.isGenerating) {
       fraudService.startTransactionGeneration(3000);
-      console.log(' Transaction generation started');
+      console.log('Transaction generation started');
     }
 
     socket.on('disconnect', () => {
-      console.log(' Client disconnected:', socket.id);
+      console.log('Client disconnected:', socket.id);
       
-      // Stop generation if no clients connected
       if (io.engine.clientsCount === 0 && fraudService) {
         fraudService.stopTransactionGeneration();
-        console.log('💤 Transaction generation stopped (no clients)');
+        console.log('Transaction generation stopped (no clients)');
       }
     });
 
-    // Handle stats request
     socket.on('requestStats', async () => {
       if (fraudService) {
         try {
@@ -61,24 +66,23 @@ const initSocket = (server) => {
       }
     });
 
-    // Handle connection errors
     socket.on('error', (error) => {
       console.error('Socket error:', error);
     });
   });
 
-  console.log(' Socket.IO initialized with CORS');
+  console.log('Socket.IO initialized with CORS');
   return io;
 };
 
 const setFraudService = (service) => {
   fraudService = service;
-  console.log(' Fraud service injected into socket layer');
+  console.log('Fraud service injected into socket layer');
 };
 
 const emitTransaction = (transaction) => {
   if (!io) {
-    console.warn(' Socket.IO not initialized');
+    console.warn('Socket.IO not initialized');
     return;
   }
 
