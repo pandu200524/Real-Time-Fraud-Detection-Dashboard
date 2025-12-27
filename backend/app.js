@@ -1,37 +1,19 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-require("dotenv").config();
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
 const app = express();
 
-// CORS Configuration - CRITICAL: Add your Vercel URL
+// SIMPLE CORS FIX - Allow all origins for now
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app'
-    ];
-    
-    // Check if origin is allowed or is a Vercel preview deployment
-    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    } else {
-      console.log('Blocked by CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: '*', // Allow all origins temporarily
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Handle preflight requests explicitly
+// Explicit preflight handler
 app.options('*', cors());
 
 app.use(express.json());
@@ -46,9 +28,13 @@ app.get("/", (req, res) => {
   res.json({ 
     message: "Fraud Detection API",
     version: "1.0.0",
+    status: "online",
+    cors: "enabled",
     endpoints: {
       health: "/health",
-      api: "/api/*"
+      corsTest: "/api/cors-test",
+      auth: "/api/auth/*",
+      transactions: "/api/transactions/*"
     }
   });
 });
@@ -60,6 +46,15 @@ app.get("/health", (req, res) => {
     database: dbStatus,
     timestamp: new Date().toISOString(),
     service: "Fraud Detection API"
+  });
+});
+
+// CORS test endpoint
+app.get("/api/cors-test", (req, res) => {
+  res.json({
+    message: "CORS is working!",
+    origin: req.headers.origin || "No origin header",
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -77,12 +72,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-// Fallback route
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ 
     error: "Endpoint not found",
     path: req.path 
   });
 });
+
+const PORT = process.env.PORT || 5000;
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log("Server running on port", PORT);
+    console.log("CORS: Enabled (all origins allowed)");
+  });
+}
 
 module.exports = app;
