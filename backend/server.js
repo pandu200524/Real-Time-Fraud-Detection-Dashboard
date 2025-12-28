@@ -7,7 +7,7 @@ const cors = require('cors');
 const http = require('http');
 
 // 🔥 IMPORT SOCKET INITIALIZER
-const { initSocket, setFraudService } = require('./socket');
+const { initSocket, setFraudService } = require('./src/sockets/socket');
 
 const app = express();
 
