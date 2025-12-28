@@ -1,9 +1,9 @@
 services:
-  # Backend API Service
+  # Backend API Service (Node.js)
   - type: web
     name: fraud-detection-api
     env: node
-    region: oregon  # ← Keep for web services
+    region: oregon
     plan: free
     buildCommand: cd backend && npm install
     startCommand: cd backend && npm start
@@ -25,11 +25,12 @@ services:
     healthCheckPath: /health
     autoDeploy: true
 
-  # Frontend Service - REMOVE REGION FOR STATIC SITES
-  - type: static
+  # Frontend Service (Static Site) - CORRECT SYNTAX
+  - type: web
     name: fraud-detection-frontend
-    # NO REGION FOR STATIC SITES ← This is the fix
+    env: static
     plan: free
+    # NO region for static sites in Blueprints
     buildCommand: |
       cd frontend
       npm install
