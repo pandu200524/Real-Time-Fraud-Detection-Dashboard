@@ -22,17 +22,22 @@ app.options('*', (req, res) => {
   res.status(204).send(); // No content for OPTIONS
 });
 
-// CORS Configuration - SIMPLIFIED VERSION
+// CORS Configuration - UPDATED WITH YOUR FRONTEND DOMAINS
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow all origins for testing, or specify your domains
     const allowedOrigins = [
+      // Vercel domains
       'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app',
       'https://real-time-fraud-detection-dashboard.vercel.app',
+      // Render frontend domain (ADD THIS!)
+      'https://fraud-detection-frontend-u1ji.onrender.com',
+      // Local development
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:5173',
-      undefined // Allow requests with no origin (like Postman)
+      // Allow requests with no origin (like Postman)
+      undefined
     ];
     
     console.log('CORS Origin check:', origin);
@@ -152,7 +157,6 @@ app.options('/api/cors-test', (req, res) => {
 const authRoutes = require('./src/routes/auth.routes');
 const transactionRoutes = require('./src/routes/transaction.routes');
 
-
 // Handle preflight for all auth routes
 app.options('/api/auth/*', (req, res) => {
   console.log('Auth preflight for:', req.url);
@@ -162,7 +166,6 @@ app.options('/api/auth/*', (req, res) => {
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
-
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -177,6 +180,7 @@ app.use((err, req, res, next) => {
       yourOrigin: req.headers.origin,
       allowedOrigins: [
         'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app',
+        'https://fraud-detection-frontend-u1ji.onrender.com',
         'http://localhost:3000'
       ]
     });
@@ -208,38 +212,34 @@ mongoose.connect(process.env.MONGODB_URI, {
   useUnifiedTopology: true
 })
 .then(() => {
-  console.log('MongoDB connected');
+  console.log('✅ MongoDB connected');
   
   // Start server after DB connection
   server.listen(PORT, () => {
     console.log('='.repeat(60));
-    console.log('Fraud Detection API Started');
+    console.log('🚀 Fraud Detection API Started');
     console.log('='.repeat(60));
-    console.log(`REST API: http://localhost:${PORT}`);
-    console.log(`WebSocket: ws://localhost:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log('CORS: ENABLED');
-    console.log('Preflight: HANDLED');
+    console.log(`📡 REST API: http://localhost:${PORT}`);
+    console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('✅ CORS: ENABLED');
+    console.log('✅ Preflight: HANDLED');
     console.log('Allowed Origins:');
     console.log('  • https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app');
     console.log('  • https://real-time-fraud-detection-dashboard.vercel.app');
+    console.log('  • https://fraud-detection-frontend-u1ji.onrender.com');
     console.log('  • http://localhost:3000');
     console.log('  • http://localhost:3001');
-    console.log('='.repeat(60));
-    
-    // Test URL for debugging
-    console.log('\nTest CORS with:');
-    console.log(`  curl -X OPTIONS -H "Origin: https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app" -H "Access-Control-Request-Method: POST" http://localhost:${PORT}/api/auth/login`);
     console.log('='.repeat(60));
     
     // Clean up old transactions on startup
     setTimeout(async () => {
       try {
         await fraudService.cleanupOldTransactions();
-        console.log('Database cleanup complete');
+        console.log('✅ Database cleanup complete');
         
         const stats = await fraudService.getStats();
-        console.log(`Current: ${stats.totalTransactions} transactions, ${stats.highRiskTransactions} flagged`);
+        console.log(`📊 Current: ${stats.totalTransactions} transactions, ${stats.highRiskTransactions} flagged`);
       } catch (error) {
         console.error('Startup cleanup error:', error.message);
       }
@@ -247,7 +247,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   });
 })
 .catch(err => {
-  console.error('MongoDB connection error:', err);
+  console.error('❌ MongoDB connection error:', err);
   process.exit(1);
 });
 
