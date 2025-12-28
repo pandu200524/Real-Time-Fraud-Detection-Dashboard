@@ -27,7 +27,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const TransactionTable = () => {
   const dispatch = useDispatch();
-  const { transactions, pagination, loading } = useSelector((state) => state.transactions);
+  const { transactions = [], pagination, loading } = useSelector((state) => state.transactions);
   const { user, token } = useSelector((state) => state.auth);
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,6 +41,7 @@ const TransactionTable = () => {
   const [exportFormat, setExportFormat] = useState('json');
   const [exportLoading, setExportLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [localLoading, setLocalLoading] = useState(false);
 
   // Initialize pagination with default values to prevent undefined errors
   const safePagination = pagination || {
@@ -51,7 +52,18 @@ const TransactionTable = () => {
   };
 
   useEffect(() => {
-    dispatch(fetchTransactions({ page: currentPage }));
+    const loadTransactions = async () => {
+      try {
+        setLocalLoading(true);
+        await dispatch(fetchTransactions({ page: currentPage })).unwrap();
+      } catch (error) {
+        console.error('Failed to load transactions:', error);
+      } finally {
+        setLocalLoading(false);
+      }
+    };
+    
+    loadTransactions();
   }, [dispatch, currentPage]);
 
   const handleSort = (field) => {
@@ -67,6 +79,7 @@ const TransactionTable = () => {
   };
 
   const handlePageChange = (page) => {
+    if (page < 1 || page > safePagination.pages) return;
     setCurrentPage(page);
     dispatch(fetchTransactions({ page }));
   };
@@ -80,6 +93,8 @@ const TransactionTable = () => {
     try {
       await dispatch(markAsReviewed(transactionId)).unwrap();
       console.log('Transaction marked as reviewed');
+      // Refresh the current page to update the transaction status
+      dispatch(fetchTransactions({ page: currentPage }));
     } catch (error) {
       console.error('Failed to mark as reviewed:', error);
       alert('Failed to mark transaction as reviewed');
@@ -87,6 +102,11 @@ const TransactionTable = () => {
   };
 
   const handleExport = async () => {
+    if (!token) {
+      alert('Authentication required for export');
+      return;
+    }
+
     setExportLoading(true);
     try {
       const response = await axios.post(
@@ -97,7 +117,8 @@ const TransactionTable = () => {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          responseType: exportFormat === 'csv' ? 'text' : 'json'
+          responseType: exportFormat === 'csv' ? 'text' : 'json',
+          timeout: 30000 // 30 second timeout
         }
       );
       
@@ -119,7 +140,7 @@ const TransactionTable = () => {
       console.log('Export successful');
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export failed. Please try again.');
+      alert(`Export failed: ${error.response?.data?.message || error.message || 'Please try again.'}`);
     } finally {
       setExportLoading(false);
     }
@@ -137,37 +158,44 @@ const TransactionTable = () => {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
-  const filteredTransactions = transactions.filter(transaction => {
-    if (!transaction) return false;
-    
-    const matchesSearch = 
-      transaction.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.merchant?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRisk = riskFilter === 'all' || 
-      (riskFilter === 'low' && transaction.riskScore < 30) ||
-      (riskFilter === 'medium' && transaction.riskScore >= 30 && transaction.riskScore < 70) ||
-      (riskFilter === 'high' && transaction.riskScore >= 70);
-    
-    const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'flagged' && transaction.isFlagged) ||
-      (statusFilter === 'reviewed' && transaction.isReviewed);
+  const filteredTransactions = Array.isArray(transactions) 
+    ? transactions.filter(transaction => {
+        if (!transaction) return false;
+        
+        const matchesSearch = 
+          transaction.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          transaction.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          transaction.merchant?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesRisk = riskFilter === 'all' || 
+          (riskFilter === 'low' && transaction.riskScore < 30) ||
+          (riskFilter === 'medium' && transaction.riskScore >= 30 && transaction.riskScore < 70) ||
+          (riskFilter === 'high' && transaction.riskScore >= 70);
+        
+        const matchesStatus = statusFilter === 'all' ||
+          (statusFilter === 'flagged' && transaction.isFlagged) ||
+          (statusFilter === 'reviewed' && transaction.isReviewed);
 
-    return matchesSearch && matchesRisk && matchesStatus;
-  });
+        return matchesSearch && matchesRisk && matchesStatus;
+      })
+    : [];
 
   const SortableHeader = ({ field, children }) => (
     <th 
@@ -187,11 +215,13 @@ const TransactionTable = () => {
     </th>
   );
 
-  if (loading && transactions.length === 0) {
+  const isLoading = loading || localLoading;
+
+  if (isLoading && transactions.length === 0) {
     return (
-      <div className="table-container p-4 text-center">
+      <div className="table-container p-5 text-center">
         <Spinner animation="border" variant="primary" />
-        <p className="mt-2 text-muted">Loading transactions...</p>
+        <p className="mt-3 text-muted">Loading transactions...</p>
       </div>
     );
   }
@@ -210,13 +240,14 @@ const TransactionTable = () => {
                   placeholder="Search transactions, customers, merchants..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={isLoading}
                 />
               </InputGroup>
             </div>
             <div className="col-md-6 d-flex justify-content-md-end">
               <div className="d-flex gap-2">
                 <Dropdown>
-                  <Dropdown.Toggle variant="outline-secondary" size="sm">
+                  <Dropdown.Toggle variant="outline-secondary" size="sm" disabled={isLoading}>
                     <FaFilter className="me-1" />
                     Risk: {riskFilter === 'all' ? 'All' : riskFilter.charAt(0).toUpperCase() + riskFilter.slice(1)}
                   </Dropdown.Toggle>
@@ -229,7 +260,7 @@ const TransactionTable = () => {
                 </Dropdown>
 
                 <Dropdown>
-                  <Dropdown.Toggle variant="outline-secondary" size="sm">
+                  <Dropdown.Toggle variant="outline-secondary" size="sm" disabled={isLoading}>
                     Status: {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
@@ -244,8 +275,9 @@ const TransactionTable = () => {
                   size="sm"
                   onClick={() => dispatch(fetchTransactions({ page: currentPage }))}
                   title="Refresh"
+                  disabled={isLoading}
                 >
-                  <FaSync />
+                  {isLoading ? <Spinner animation="border" size="sm" /> : <FaSync />}
                 </Button>
 
                 {user?.role === 'admin' && (
@@ -253,6 +285,7 @@ const TransactionTable = () => {
                     variant="primary"
                     size="sm"
                     onClick={() => setShowExportModal(true)}
+                    disabled={isLoading || filteredTransactions.length === 0}
                   >
                     <FaFileExport className="me-1" />
                     Export
@@ -278,11 +311,18 @@ const TransactionTable = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.length > 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-4">
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    <span className="text-muted">Loading transactions...</span>
+                  </td>
+                </tr>
+              ) : filteredTransactions.length > 0 ? (
                 filteredTransactions.map((transaction) => (
-                  <tr key={transaction._id} className={transaction.isFlagged ? 'table-warning' : ''}>
+                  <tr key={transaction._id || transaction.transactionId} className={transaction.isFlagged ? 'table-warning' : ''}>
                     <td>
-                      <small className="text-muted">{transaction.transactionId}</small>
+                      <small className="text-muted">{transaction.transactionId || 'N/A'}</small>
                     </td>
                     <td>
                       <small>{formatDate(transaction.timestamp)}</small>
@@ -298,7 +338,7 @@ const TransactionTable = () => {
                       <small className="text-muted">{transaction.paymentMethod || ''}</small>
                     </td>
                     <td className="fw-bold">
-                      {formatCurrency(transaction.amount || 0)}
+                      {formatCurrency(transaction.amount)}
                     </td>
                     <td>
                       <div className="d-flex align-items-center">
@@ -324,6 +364,7 @@ const TransactionTable = () => {
                           size="sm"
                           title="View Details"
                           onClick={() => handleViewDetails(transaction)}
+                          disabled={isLoading}
                         >
                           <FaEye />
                         </Button>
@@ -333,6 +374,7 @@ const TransactionTable = () => {
                             size="sm"
                             title="Mark as Reviewed"
                             onClick={() => handleMarkAsReviewed(transaction._id)}
+                            disabled={isLoading}
                           >
                             ✓
                           </Button>
@@ -343,8 +385,21 @@ const TransactionTable = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="text-center py-4">
-                    <p className="text-muted mb-0">No transactions found</p>
+                  <td colSpan="8" className="text-center py-5">
+                    <div className="text-muted mb-3">No transactions found</div>
+                    {(searchTerm || riskFilter !== 'all' || statusFilter !== 'all') && (
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setRiskFilter('all');
+                          setStatusFilter('all');
+                        }}
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
                   </td>
                 </tr>
               )}
@@ -352,7 +407,7 @@ const TransactionTable = () => {
           </Table>
         </div>
 
-        {filteredTransactions.length > 0 && (
+        {filteredTransactions.length > 0 && safePagination.pages > 1 && (
           <div className="p-3 border-top bg-white">
             <div className="d-flex justify-content-between align-items-center">
               <div>
@@ -363,7 +418,7 @@ const TransactionTable = () => {
               <Pagination size="sm" className="mb-0">
                 <Pagination.Prev 
                   onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || isLoading}
                 />
                 {[...Array(Math.min(5, safePagination.pages || 1))].map((_, i) => {
                   const pageNum = i + 1;
@@ -372,6 +427,7 @@ const TransactionTable = () => {
                       key={pageNum}
                       active={pageNum === currentPage}
                       onClick={() => handlePageChange(pageNum)}
+                      disabled={isLoading}
                     >
                       {pageNum}
                     </Pagination.Item>
@@ -380,7 +436,7 @@ const TransactionTable = () => {
                 {(safePagination.pages || 1) > 5 && <Pagination.Ellipsis />}
                 <Pagination.Next 
                   onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === (safePagination.pages || 1)}
+                  disabled={currentPage === (safePagination.pages || 1) || isLoading}
                 />
               </Pagination>
             </div>
@@ -399,11 +455,11 @@ const TransactionTable = () => {
               <div className="row mb-3">
                 <div className="col-md-6">
                   <h6 className="text-muted mb-2">Transaction ID</h6>
-                  <p className="fw-bold">{selectedTransaction.transactionId}</p>
+                  <p className="fw-bold">{selectedTransaction.transactionId || 'N/A'}</p>
                 </div>
                 <div className="col-md-6">
                   <h6 className="text-muted mb-2">Timestamp</h6>
-                  <p>{new Date(selectedTransaction.timestamp).toLocaleString()}</p>
+                  <p>{selectedTransaction.timestamp ? new Date(selectedTransaction.timestamp).toLocaleString() : 'N/A'}</p>
                 </div>
               </div>
 
@@ -415,8 +471,8 @@ const TransactionTable = () => {
                 <div className="col-md-6">
                   <h6 className="text-muted mb-2">Risk Score</h6>
                   <div className="d-flex align-items-center">
-                    {getRiskBadge(selectedTransaction.riskScore)}
-                    <span className="ms-2 fw-bold fs-4">{selectedTransaction.riskScore}/100</span>
+                    {getRiskBadge(selectedTransaction.riskScore || 0)}
+                    <span className="ms-2 fw-bold fs-4">{selectedTransaction.riskScore || 0}/100</span>
                   </div>
                 </div>
               </div>
@@ -526,6 +582,7 @@ const TransactionTable = () => {
                   checked={exportFormat === 'json'}
                   onChange={() => setExportFormat('json')}
                   className="mb-2"
+                  disabled={exportLoading}
                 />
                 <Form.Check
                   type="radio"
@@ -533,6 +590,7 @@ const TransactionTable = () => {
                   name="exportFormat"
                   checked={exportFormat === 'csv'}
                   onChange={() => setExportFormat('csv')}
+                  disabled={exportLoading}
                 />
               </div>
             </Form.Group>
@@ -544,13 +602,13 @@ const TransactionTable = () => {
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowExportModal(false)}>
+          <Button variant="secondary" onClick={() => setShowExportModal(false)} disabled={exportLoading}>
             Cancel
           </Button>
           <Button 
             variant="primary" 
             onClick={handleExport}
-            disabled={exportLoading}
+            disabled={exportLoading || filteredTransactions.length === 0}
           >
             {exportLoading ? (
               <>
