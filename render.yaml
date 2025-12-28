@@ -1,4 +1,5 @@
 services:
+  # Backend API Service
   - type: web
     name: fraud-detection-api
     env: node
@@ -21,5 +22,35 @@ services:
         sync: false
       - key: AI_PROVIDER
         value: gemini
+      - key: CORS_ORIGIN
+        value: https://real-time-fraud-detection-dashboard.onrender.com
+      - key: WS_ENABLED
+        value: true
     healthCheckPath: /health
+    autoDeploy: true
+
+  # Frontend Service
+  - type: web
+    name: fraud-detection-frontend
+    env: static
+    region: oregon
+    plan: free
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    staticPublishPath: ./frontend/build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://fraud-detection-api.onrender.com
+      - key: REACT_APP_WS_URL
+        value: wss://fraud-detection-api.onrender.com
+      - key: REACT_APP_AI_PROVIDER
+        value: gemini
+      - key: REACT_APP_ENV
+        value: production
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     autoDeploy: true
