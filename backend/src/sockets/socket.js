@@ -6,30 +6,14 @@ let fraudService = null;
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: function(origin, callback) {
-        if (!origin) return callback(null, true);
-        
-        const allowedOrigins = [
-          'http://localhost:3000',
-          'http://localhost:3001',
-          'https://real-time-fraud-detection-dashboard-pandu200524s-projects.vercel.app'
-        ];
-        
-        if (allowedOrigins.includes(origin) || (origin && origin.endsWith('.vercel.app'))) {
-          callback(null, true);
-        } else {
-          console.log('WebSocket blocked by CORS:', origin);
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      origin: '*', // ✅ ALLOW ALL (Render-safe)
       methods: ['GET', 'POST'],
-      credentials: true,
-      allowedHeaders: ['Content-Type', 'Authorization']
+      allowedHeaders: ['Content-Type', 'Authorization'],
     },
     transports: ['websocket', 'polling'],
     path: '/socket.io',
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
   });
 
   global.io = io;
@@ -48,7 +32,7 @@ const initSocket = (server) => {
 
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
-      
+
       if (io.engine.clientsCount === 0 && fraudService) {
         fraudService.stopTransactionGeneration();
         console.log('Transaction generation stopped (no clients)');
@@ -56,13 +40,13 @@ const initSocket = (server) => {
     });
 
     socket.on('requestStats', async () => {
-      if (fraudService) {
-        try {
-          const stats = await fraudService.getStats();
-          socket.emit('stats', stats);
-        } catch (error) {
-          console.error('Error fetching stats:', error);
-        }
+      if (!fraudService) return;
+
+      try {
+        const stats = await fraudService.getStats();
+        socket.emit('stats', stats);
+      } catch (error) {
+        console.error('Error fetching stats:', error);
       }
     });
 
@@ -71,7 +55,7 @@ const initSocket = (server) => {
     });
   });
 
-  console.log('Socket.IO initialized with CORS');
+  console.log('Socket.IO initialized (CORS open)');
   return io;
 };
 
@@ -81,10 +65,7 @@ const setFraudService = (service) => {
 };
 
 const emitTransaction = (transaction) => {
-  if (!io) {
-    console.warn('Socket.IO not initialized');
-    return;
-  }
+  if (!io) return;
 
   io.emit('newTransaction', transaction);
 
@@ -104,5 +85,5 @@ module.exports = {
   initSocket,
   setFraudService,
   emitTransaction,
-  getIO
+  getIO,
 };
