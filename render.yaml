@@ -3,7 +3,7 @@ services:
   - type: web
     name: fraud-detection-api
     env: node
-    region: oregon
+    region: oregon  # ← Keep for web services
     plan: free
     buildCommand: cd backend && npm install
     startCommand: cd backend && npm start
@@ -16,24 +16,19 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: OPENAI_API_KEY
-        sync: false
       - key: GOOGLE_GEMINI_API_KEY
         sync: false
       - key: AI_PROVIDER
         value: gemini
       - key: CORS_ORIGIN
-        value: https://real-time-fraud-detection-dashboard.onrender.com
-      - key: WS_ENABLED
-        value: true
+        value: https://fraud-detection-frontend.onrender.com
     healthCheckPath: /health
     autoDeploy: true
 
-  # Frontend Service
-  - type: web
+  # Frontend Service - REMOVE REGION FOR STATIC SITES
+  - type: static
     name: fraud-detection-frontend
-    env: static
-    region: oregon
+    # NO REGION FOR STATIC SITES ← This is the fix
     plan: free
     buildCommand: |
       cd frontend
