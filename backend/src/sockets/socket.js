@@ -6,7 +6,7 @@ let fraudService = null;
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: '*', // ✅ ALLOW ALL (Render-safe)
+      origin: '*', 
       methods: ['GET', 'POST'],
       allowedHeaders: ['Content-Type', 'Authorization'],
     },
