@@ -8,9 +8,6 @@ const app = express();
 
 // ============ ULTIMATE CORS FIX ============
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Origin:', req.headers.origin || 'No origin');
-  
   // SET CORS HEADERS FOR EVERY SINGLE REQUEST
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
@@ -20,7 +17,6 @@ app.use((req, res, next) => {
   
   // Handle OPTIONS preflight IMMEDIATELY
   if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS preflight');
     return res.status(200).end();
   }
   
@@ -38,12 +34,12 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/fraud-det
 })
 .then(() => {
   console.log('MongoDB Connected');
-  // Create default users if they don't exist
+  // Create default users
   createDefaultUsers();
 })
 .catch(err => console.log('MongoDB Error:', err.message));
 
-// User Schema (if you don't have models/user.model.js)
+// User Schema
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -57,7 +53,8 @@ async function createDefaultUsers() {
   try {
     const users = [
       { name: 'Admin User', email: 'admin@fraud.com', password: 'admin123', role: 'admin' },
-      { name: 'Viewer User', email: 'viewer@fraud.com', password: 'viewer123', role: 'viewer' }
+      { name: 'Viewer User', email: 'viewer@fraud.com', password: 'viewer123', role: 'viewer' },
+      { name: 'Test User', email: 'test@test.com', password: 'test123', role: 'admin' }
     ];
     
     for (const userData of users) {
@@ -114,7 +111,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Return user data without password
     const userResponse = {
-      id: user._id,
+      id: user._id.toString(),
       email: user.email,
       name: user.name,
       role: user.role
@@ -155,6 +152,38 @@ app.get('/api/cors-test', (req, res) => {
   });
 });
 
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Fraud Detection API',
+    version: '1.0.0',
+    status: 'online',
+    cors: 'enabled',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      root: '/',
+      test: '/test',
+      corsTest: '/api/cors-test',
+      login: 'POST /api/auth/login',
+      health: '/health'
+    },
+    defaultUsers: {
+      admin: 'admin@fraud.com / admin123',
+      viewer: 'viewer@fraud.com / viewer123',
+      test: 'test@test.com / test123'
+    }
+  });
+});
+
+app.get('/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    database: dbStatus,
+    cors: 'enabled'
+  });
+});
+
 // ============ OTHER ROUTES ============
 try {
   const transactionRoutes = require('./src/routes/transaction.routes');
@@ -175,7 +204,8 @@ app.use((req, res) => {
   res.status(404).json({ 
     error: 'Endpoint not found',
     path: req.url,
-    method: req.method
+    method: req.method,
+    availableEndpoints: ['/', '/test', '/health', '/api/cors-test', 'POST /api/auth/login']
   });
 });
 
@@ -186,12 +216,15 @@ app.listen(PORT, () => {
   console.log('SERVER STARTED ON PORT ' + PORT);
   console.log('='.repeat(60));
   console.log('\nLOGIN CREDENTIALS:');
-  console.log('1. admin@fraud.com / admin123');
-  console.log('2. viewer@fraud.com / viewer123');
+  console.log('1. admin@fraud.com / admin123 (Admin)');
+  console.log('2. viewer@fraud.com / viewer123 (Viewer)');
+  console.log('3. test@test.com / test123 (Test Admin)');
   console.log('\nTEST ENDPOINTS:');
-  console.log('1. GET  /test');
-  console.log('2. GET  /api/cors-test');
-  console.log('3. POST /api/auth/login');
+  console.log('GET  /');
+  console.log('GET  /test');
+  console.log('GET  /health');
+  console.log('GET  /api/cors-test');
+  console.log('POST /api/auth/login');
   console.log('\n' + '='.repeat(60));
 });
 
