@@ -8,7 +8,6 @@ const app = express();
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   console.log('Origin:', req.headers.origin || 'No origin');
-  console.log('User-Agent:', req.headers['user-agent']?.substring(0, 50));
   
   // SET CORS HEADERS FOR EVERY SINGLE REQUEST
   res.header('Access-Control-Allow-Origin', '*');
@@ -25,8 +24,6 @@ app.use((req, res, next) => {
   
   next();
 });
-
-// Remove ALL other CORS middleware imports and configurations
 
 // Body parsing
 app.use(express.json());
