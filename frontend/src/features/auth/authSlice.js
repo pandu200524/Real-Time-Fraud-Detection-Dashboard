@@ -1,8 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-// Direct Render URL
-const API_URL = 'https://real-time-fraud-detection-dashboard.onrender.com';
+// Direct Render URL - CHANGE TO YOUR ACTUAL BACKEND URL
+const API_URL = process.env.REACT_APP_API_URL || 'https://real-time-fraud-detection-dashboard.onrender.com';
 
 export const login = createAsyncThunk(
   'auth/login',
@@ -13,20 +13,38 @@ export const login = createAsyncThunk(
         `${API_URL}/api/auth/login`,
         { email, password },
         {
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
           // NO withCredentials
         }
       );
       
       const { token, user } = response.data;
       
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+      if (user) {
+        localStorage.setItem('user', JSON.stringify(user));
+      }
       
       return { token, user };
     } catch (error) {
-      console.error('Login error:', error);
-      return rejectWithValue(error.response?.data?.error || 'Login failed');
+      console.error('Login error details:', error);
+      
+      if (error.response) {
+        const errorMessage = error.response.data?.error || 
+                           error.response.data?.message || 
+                           'Login failed. Please check credentials.';
+        return rejectWithValue(errorMessage);
+      } else if (error.request) {
+        console.error('No response from server. Check:', API_URL);
+        return rejectWithValue('Cannot connect to server. Please check your connection.');
+      } else {
+        return rejectWithValue('An unexpected error occurred: ' + error.message);
+      }
     }
   }
 );
@@ -47,7 +65,9 @@ const authSlice = createSlice({
     error: null,
   },
   reducers: {
-    clearError: (state) => { state.error = null; },
+    clearError: (state) => {
+      state.error = null;
+    },
     setUser: (state, action) => {
       state.user = action.payload;
       state.isAuthenticated = true;
