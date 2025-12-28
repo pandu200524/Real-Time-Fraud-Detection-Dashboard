@@ -1,42 +1,38 @@
 services:
-  # Backend API Service (Node.js)
+  # Backend API
   - type: web
     name: fraud-detection-api
-    env: node
+    runtime: node
     region: oregon
-    plan: free
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && npm start
+    plan: starter
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 5000
-      - key: MONGODB_URI
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-      - key: GOOGLE_GEMINI_API_KEY
-        sync: false
-      - key: AI_PROVIDER
-        value: gemini
       - key: CORS_ORIGIN
         value: https://fraud-detection-frontend.onrender.com
     healthCheckPath: /health
     autoDeploy: true
 
-  # Frontend Service (Static Site) - CORRECT SYNTAX
+  # Frontend - Deploy as web service with serve
   - type: web
     name: fraud-detection-frontend
-    env: static
-    plan: free
-    # NO region for static sites in Blueprints
+    runtime: node
+    region: oregon
+    plan: starter
+    rootDir: frontend
     buildCommand: |
-      cd frontend
       npm install
       npm run build
-    staticPublishPath: ./frontend/build
+      npm install -g serve
+    startCommand: serve -s build -l 3000
     envVars:
+      - key: PORT
+        value: 3000
       - key: REACT_APP_API_URL
         value: https://fraud-detection-api.onrender.com
       - key: REACT_APP_WS_URL
@@ -45,8 +41,5 @@ services:
         value: gemini
       - key: REACT_APP_ENV
         value: production
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    healthCheckPath: /
     autoDeploy: true
