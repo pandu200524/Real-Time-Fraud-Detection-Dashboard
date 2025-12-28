@@ -40,26 +40,34 @@ const TransactionTable = () => {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [exportFormat, setExportFormat] = useState('json');
   const [exportLoading, setExportLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Initialize pagination with default values to prevent undefined errors
+  const safePagination = pagination || {
+    page: 1,
+    pages: 1,
+    total: 0,
+    limit: 10
+  };
 
   useEffect(() => {
-    dispatch(fetchTransactions({ page: pagination.page }));
-  }, [dispatch, pagination.page]);
+    dispatch(fetchTransactions({ page: currentPage }));
+  }, [dispatch, currentPage]);
 
   const handleSort = (field) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('desc');
-    }
+    const newSortOrder = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortField(field);
+    setSortOrder(newSortOrder);
     dispatch(fetchTransactions({ 
       page: 1, 
       sortBy: field, 
-      sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' 
+      sortOrder: newSortOrder 
     }));
+    setCurrentPage(1);
   };
 
   const handlePageChange = (page) => {
+    setCurrentPage(page);
     dispatch(fetchTransactions({ page }));
   };
 
@@ -142,6 +150,8 @@ const TransactionTable = () => {
   };
 
   const filteredTransactions = transactions.filter(transaction => {
+    if (!transaction) return false;
+    
     const matchesSearch = 
       transaction.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -170,7 +180,8 @@ const TransactionTable = () => {
         className={`ms-1 ${sortField === field ? 'text-primary' : 'text-muted'}`}
         style={{ 
           opacity: sortField === field ? 1 : 0.3,
-          transform: sortField === field && sortOrder === 'desc' ? 'rotate(180deg)' : 'none'
+          transform: sortField === field && sortOrder === 'desc' ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.2s ease'
         }}
       />
     </th>
@@ -207,7 +218,7 @@ const TransactionTable = () => {
                 <Dropdown>
                   <Dropdown.Toggle variant="outline-secondary" size="sm">
                     <FaFilter className="me-1" />
-                    Risk: {riskFilter === 'all' ? 'All' : riskFilter}
+                    Risk: {riskFilter === 'all' ? 'All' : riskFilter.charAt(0).toUpperCase() + riskFilter.slice(1)}
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.Item onClick={() => setRiskFilter('all')}>All Risks</Dropdown.Item>
@@ -219,7 +230,7 @@ const TransactionTable = () => {
 
                 <Dropdown>
                   <Dropdown.Toggle variant="outline-secondary" size="sm">
-                    Status: {statusFilter === 'all' ? 'All' : statusFilter}
+                    Status: {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.Item onClick={() => setStatusFilter('all')}>All</Dropdown.Item>
@@ -231,7 +242,8 @@ const TransactionTable = () => {
                 <Button
                   variant="outline-primary"
                   size="sm"
-                  onClick={() => dispatch(fetchTransactions({ page: pagination.page }))}
+                  onClick={() => dispatch(fetchTransactions({ page: currentPage }))}
+                  title="Refresh"
                 >
                   <FaSync />
                 </Button>
@@ -266,121 +278,114 @@ const TransactionTable = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.map((transaction) => (
-                <tr key={transaction._id} className={transaction.isFlagged ? 'table-warning' : ''}>
-                  <td>
-                    <small className="text-muted">{transaction.transactionId}</small>
-                  </td>
-                  <td>
-                    <small>{formatDate(transaction.timestamp)}</small>
-                  </td>
-                  <td>
-                    <div>
-                      <div className="fw-medium">{transaction.customer?.name}</div>
-                      <small className="text-muted">{transaction.customer?.location}</small>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="fw-medium">{transaction.merchant}</div>
-                    <small className="text-muted">{transaction.paymentMethod}</small>
-                  </td>
-                  <td className="fw-bold">
-                    {formatCurrency(transaction.amount)}
-                  </td>
-                  <td>
-                    <div className="d-flex align-items-center">
-                      {getRiskBadge(transaction.riskScore)}
-                      <span className={`ms-2 fw-bold ${transaction.riskScore < 30 ? 'risk-low' : transaction.riskScore < 70 ? 'risk-medium' : transaction.riskScore < 85 ? 'risk-high' : 'risk-critical'}`}>
-                        {transaction.riskScore}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    {transaction.isFlagged ? (
-                      <Badge bg="danger" className="pulse">Flagged</Badge>
-                    ) : transaction.isReviewed ? (
-                      <Badge bg="success">Reviewed</Badge>
-                    ) : (
-                      <Badge bg="secondary">Normal</Badge>
-                    )}
-                  </td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        title="View Details"
-                        onClick={() => handleViewDetails(transaction)}
-                      >
-                        <FaEye />
-                      </Button>
-                      {user?.role === 'admin' && !transaction.isReviewed && transaction.isFlagged && (
-                        <Button
-                          variant="outline-success"
-                          size="sm"
-                          title="Mark as Reviewed"
-                          onClick={() => handleMarkAsReviewed(transaction._id)}
-                        >
-                          ✓
-                        </Button>
+              {filteredTransactions.length > 0 ? (
+                filteredTransactions.map((transaction) => (
+                  <tr key={transaction._id} className={transaction.isFlagged ? 'table-warning' : ''}>
+                    <td>
+                      <small className="text-muted">{transaction.transactionId}</small>
+                    </td>
+                    <td>
+                      <small>{formatDate(transaction.timestamp)}</small>
+                    </td>
+                    <td>
+                      <div>
+                        <div className="fw-medium">{transaction.customer?.name || 'N/A'}</div>
+                        <small className="text-muted">{transaction.customer?.location || ''}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="fw-medium">{transaction.merchant || 'N/A'}</div>
+                      <small className="text-muted">{transaction.paymentMethod || ''}</small>
+                    </td>
+                    <td className="fw-bold">
+                      {formatCurrency(transaction.amount || 0)}
+                    </td>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        {getRiskBadge(transaction.riskScore || 0)}
+                        <span className={`ms-2 fw-bold ${(transaction.riskScore || 0) < 30 ? 'risk-low' : (transaction.riskScore || 0) < 70 ? 'risk-medium' : (transaction.riskScore || 0) < 85 ? 'risk-high' : 'risk-critical'}`}>
+                          {transaction.riskScore || 0}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      {transaction.isFlagged ? (
+                        <Badge bg="danger" className="pulse">Flagged</Badge>
+                      ) : transaction.isReviewed ? (
+                        <Badge bg="success">Reviewed</Badge>
+                      ) : (
+                        <Badge bg="secondary">Normal</Badge>
                       )}
-                    </div>
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1">
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          title="View Details"
+                          onClick={() => handleViewDetails(transaction)}
+                        >
+                          <FaEye />
+                        </Button>
+                        {user?.role === 'admin' && !transaction.isReviewed && transaction.isFlagged && (
+                          <Button
+                            variant="outline-success"
+                            size="sm"
+                            title="Mark as Reviewed"
+                            onClick={() => handleMarkAsReviewed(transaction._id)}
+                          >
+                            ✓
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="8" className="text-center py-4">
+                    <p className="text-muted mb-0">No transactions found</p>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </Table>
         </div>
 
-        {filteredTransactions.length === 0 && (
-          <div className="text-center py-5">
-            <p className="text-muted">No transactions found</p>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => {
-                setSearchTerm('');
-                setRiskFilter('all');
-                setStatusFilter('all');
-              }}
-            >
-              Clear Filters
-            </Button>
+        {filteredTransactions.length > 0 && (
+          <div className="p-3 border-top bg-white">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <small className="text-muted">
+                  Showing {filteredTransactions.length} of {safePagination.total || 0} transactions
+                </small>
+              </div>
+              <Pagination size="sm" className="mb-0">
+                <Pagination.Prev 
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                />
+                {[...Array(Math.min(5, safePagination.pages || 1))].map((_, i) => {
+                  const pageNum = i + 1;
+                  return (
+                    <Pagination.Item
+                      key={pageNum}
+                      active={pageNum === currentPage}
+                      onClick={() => handlePageChange(pageNum)}
+                    >
+                      {pageNum}
+                    </Pagination.Item>
+                  );
+                })}
+                {(safePagination.pages || 1) > 5 && <Pagination.Ellipsis />}
+                <Pagination.Next 
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === (safePagination.pages || 1)}
+                />
+              </Pagination>
+            </div>
           </div>
         )}
-
-        <div className="p-3 border-top bg-white">
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <small className="text-muted">
-                Showing {filteredTransactions.length} of {pagination.total} transactions
-              </small>
-            </div>
-            <Pagination size="sm" className="mb-0">
-              <Pagination.Prev 
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
-              />
-              {[...Array(Math.min(5, pagination.pages))].map((_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <Pagination.Item
-                    key={pageNum}
-                    active={pageNum === pagination.page}
-                    onClick={() => handlePageChange(pageNum)}
-                  >
-                    {pageNum}
-                  </Pagination.Item>
-                );
-              })}
-              {pagination.pages > 5 && <Pagination.Ellipsis />}
-              <Pagination.Next 
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.pages}
-              />
-            </Pagination>
-          </div>
-        </div>
       </div>
 
       {/* Transaction Details Modal */}
@@ -420,7 +425,7 @@ const TransactionTable = () => {
                 <div className="col-md-6">
                   <h6 className="text-muted mb-2">Customer</h6>
                   <p className="fw-medium mb-1">
-                    {selectedTransaction.customer?.name}
+                    {selectedTransaction.customer?.name || 'N/A'}
                     {selectedTransaction.customer?.name === 'Anonymous Customer' && (
                       <small className="badge bg-secondary ms-2" title="Protected for viewer role">
                         Protected
@@ -440,9 +445,9 @@ const TransactionTable = () => {
                 </div>
                 <div className="col-md-6">
                   <h6 className="text-muted mb-2">Merchant</h6>
-                  <p className="fw-medium mb-1">{selectedTransaction.merchant}</p>
+                  <p className="fw-medium mb-1">{selectedTransaction.merchant || 'N/A'}</p>
                   <small className="text-muted d-block">
-                    Payment: {selectedTransaction.paymentMethod}
+                    Payment: {selectedTransaction.paymentMethod || 'N/A'}
                   </small>
                 </div>
               </div>
@@ -474,7 +479,7 @@ const TransactionTable = () => {
                     )}
                   </p>
                 </div>
-                {selectedTransaction.isReviewed && (
+                {selectedTransaction.isReviewed && selectedTransaction.reviewedAt && (
                   <div className="col-md-6">
                     <h6 className="text-muted mb-2">Reviewed</h6>
                     <p>
@@ -561,7 +566,7 @@ const TransactionTable = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </>
+    </>                                    
   );
 };
 
