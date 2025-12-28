@@ -4,17 +4,16 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const http = require('http');
+
+// 🔥 IMPORT SOCKET INITIALIZER
+const { initSocket, setFraudService } = require('./socket');
 
 const app = express();
 
 /* =========================
-   ✅ CORS FIX (RENDER ONLY)
-   =========================
-   - Frontend & Backend on Render
-   - No cookies used
-   - JWT returned in JSON
-   - Safe to allow all origins
-*/
+   CORS (RENDER SAFE)
+   ========================= */
 app.use(
   cors({
     origin: '*',
@@ -23,12 +22,8 @@ app.use(
   })
 );
 
-// REQUIRED for browser preflight
 app.options('*', cors());
 
-/* =========================
-   MIDDLEWARE
-   ========================= */
 app.use(express.json());
 
 /* =========================
@@ -52,7 +47,7 @@ mongoose
   );
 
 /* =========================
-   USER MODEL
+   MODELS
    ========================= */
 const userSchema = new mongoose.Schema({
   name: String,
@@ -61,58 +56,48 @@ const userSchema = new mongoose.Schema({
   role: { type: String, default: 'viewer' },
 });
 
+const transactionSchema = new mongoose.Schema({
+  amount: Number,
+  riskScore: Number,
+  status: String,
+  isFlagged: Boolean,
+  createdAt: { type: Date, default: Date.now },
+});
+
 const User =
   mongoose.models.User ||
   mongoose.model('User', userSchema);
 
+const Transaction =
+  mongoose.models.Transaction ||
+  mongoose.model('Transaction', transactionSchema);
+
 /* =========================
-   CREATE DEFAULT USERS
+   DEFAULT USERS
    ========================= */
 async function createDefaultUsers() {
-  try {
-    const users = [
-      {
-        name: 'Admin User',
-        email: 'admin@fraud.com',
-        password: 'admin123',
-        role: 'admin',
-      },
-      {
-        name: 'Viewer User',
-        email: 'viewer@fraud.com',
-        password: 'viewer123',
-        role: 'viewer',
-      },
-    ];
+  const users = [
+    {
+      name: 'Admin User',
+      email: 'admin@fraud.com',
+      password: 'admin123',
+      role: 'admin',
+    },
+    {
+      name: 'Viewer User',
+      email: 'viewer@fraud.com',
+      password: 'viewer123',
+      role: 'viewer',
+    },
+  ];
 
-    for (const userData of users) {
-      const existingUser = await User.findOne({
-        email: userData.email,
-      });
-
-      if (!existingUser) {
-        const hashedPassword = await bcrypt.hash(
-          userData.password,
-          10
-        );
-
-        await User.create({
-          name: userData.name,
-          email: userData.email,
-          password: hashedPassword,
-          role: userData.role,
-        });
-
-        console.log(
-          `Created user: ${userData.email}`
-        );
-      }
+  for (const u of users) {
+    const exists = await User.findOne({ email: u.email });
+    if (!exists) {
+      const hashed = await bcrypt.hash(u.password, 10);
+      await User.create({ ...u, password: hashed });
+      console.log(`Created user: ${u.email}`);
     }
-  } catch (error) {
-    console.error(
-      'User creation error:',
-      error.message
-    );
   }
 }
 
@@ -124,77 +109,130 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) {
+    if (!user)
       return res.status(401).json({
         error: 'Invalid email or password',
-        hint: 'Try admin@fraud.com / admin123',
       });
-    }
 
-    const isMatch = await bcrypt.compare(
+    const match = await bcrypt.compare(
       password,
       user.password
     );
-    if (!isMatch) {
+    if (!match)
       return res.status(401).json({
         error: 'Invalid email or password',
-        hint: 'Try admin@fraud.com / admin123',
       });
-    }
 
     const token = jwt.sign(
-      {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
-      },
+      { id: user._id, role: user.role },
       process.env.JWT_SECRET || 'secret-key',
       { expiresIn: '24h' }
     );
 
     res.json({
       success: true,
-      message: 'Login successful',
       token,
       user: {
         id: user._id,
-        email: user.email,
         name: user.name,
+        email: user.email,
         role: user.role,
       },
     });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
 /* =========================
-   TEST ROUTES
+   TRANSACTIONS API
    ========================= */
-app.get('/', (req, res) => {
+app.get('/api/transactions', async (req, res) => {
+  const txns = await Transaction.find()
+    .sort({ createdAt: -1 })
+    .limit(50);
+  res.json(txns);
+});
+
+app.get('/api/transactions/stats', async (req, res) => {
+  const total = await Transaction.countDocuments();
+  const highRisk = await Transaction.countDocuments({
+    riskScore: { $gte: 70 },
+  });
+
   res.json({
-    message: 'Fraud Detection API',
-    status: 'online',
+    total,
+    highRisk,
+    flagged: highRisk,
   });
 });
 
-app.get('/api/cors-test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'CORS working',
-  });
+/* =========================
+   HEALTH CHECK
+   ========================= */
+app.get('/', (req, res) => {
+  res.json({ status: 'Fraud Detection API running' });
 });
+
+/* =========================
+   SOCKET.IO SERVER
+   ========================= */
+const server = http.createServer(app);
+
+// 🔥 Initialize Socket.IO using your socket.js
+const io = initSocket(server);
+
+/* =========================
+   FRAUD SERVICE (OPTIONAL)
+   ========================= */
+const fraudService = {
+  isGenerating: false,
+  interval: null,
+
+  startTransactionGeneration(ms = 3000) {
+    if (this.isGenerating) return;
+
+    this.isGenerating = true;
+    this.interval = setInterval(async () => {
+      const txn = await Transaction.create({
+        amount: Math.floor(Math.random() * 5000),
+        riskScore: Math.floor(Math.random() * 100),
+        isFlagged: Math.random() > 0.7,
+        status: 'completed',
+      });
+
+      io.emit('newTransaction', txn);
+    }, ms);
+  },
+
+  stopTransactionGeneration() {
+    clearInterval(this.interval);
+    this.isGenerating = false;
+  },
+
+  async getStats() {
+    const total = await Transaction.countDocuments();
+    const highRisk = await Transaction.countDocuments({
+      riskScore: { $gte: 70 },
+    });
+
+    return {
+      total,
+      highRisk,
+      flagged: highRisk,
+    };
+  },
+};
+
+// Inject fraud service into socket layer
+setFraudService(fraudService);
 
 /* =========================
    START SERVER
    ========================= */
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-module.exports = app;
