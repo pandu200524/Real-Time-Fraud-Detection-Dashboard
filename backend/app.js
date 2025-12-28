@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 
@@ -34,12 +36,108 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/fraud-det
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => console.log('MongoDB Connected'))
+.then(() => {
+  console.log('MongoDB Connected');
+  // Create default users if they don't exist
+  createDefaultUsers();
+})
 .catch(err => console.log('MongoDB Error:', err.message));
 
-// ============ TEST ENDPOINTS ============
+// User Schema (if you don't have models/user.model.js)
+const userSchema = new mongoose.Schema({
+  name: String,
+  email: { type: String, unique: true },
+  password: String,
+  role: { type: String, default: 'viewer' }
+});
 
-// Test 1: Simple endpoint
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+async function createDefaultUsers() {
+  try {
+    const users = [
+      { name: 'Admin User', email: 'admin@fraud.com', password: 'admin123', role: 'admin' },
+      { name: 'Viewer User', email: 'viewer@fraud.com', password: 'viewer123', role: 'viewer' }
+    ];
+    
+    for (const userData of users) {
+      const existingUser = await User.findOne({ email: userData.email });
+      if (!existingUser) {
+        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        const user = new User({
+          name: userData.name,
+          email: userData.email,
+          password: hashedPassword,
+          role: userData.role
+        });
+        await user.save();
+        console.log(`Created user: ${userData.email}`);
+      }
+    }
+  } catch (error) {
+    console.log('User creation error:', error.message);
+  }
+}
+
+// ============ LOGIN ENDPOINT ============
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    console.log('Login attempt for:', email);
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log('User not found:', email);
+      return res.status(401).json({ 
+        error: 'Invalid email or password',
+        hint: 'Try: admin@fraud.com / admin123 or viewer@fraud.com / viewer123'
+      });
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log('Password mismatch for:', email);
+      return res.status(401).json({ 
+        error: 'Invalid email or password',
+        hint: 'Try: admin@fraud.com / admin123 or viewer@fraud.com / viewer123'
+      });
+    }
+
+    // Create token
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+      { expiresIn: '24h' }
+    );
+
+    // Return user data without password
+    const userResponse = {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role
+    };
+
+    console.log('Login successful for:', email);
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message 
+    });
+  }
+});
+
+// ============ TEST ENDPOINTS ============
 app.get('/test', (req, res) => {
   res.json({ 
     success: true, 
@@ -48,47 +146,22 @@ app.get('/test', (req, res) => {
   });
 });
 
-// Test 2: CORS test endpoint
 app.get('/api/cors-test', (req, res) => {
   res.json({
     success: true,
     message: 'CORS IS WORKING',
     origin: req.headers.origin || 'No Origin',
-    timestamp: new Date().toISOString(),
-    corsHeaders: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
-    }
+    timestamp: new Date().toISOString()
   });
 });
 
-// Test 3: Login test endpoint (ALWAYS works)
-app.post('/api/auth/test-login', (req, res) => {
-  console.log('Test login request:', req.body);
-  res.json({
-    success: true,
-    message: 'Login successful (TEST)',
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMjMiLCJlbWFpbCI6InRlc3RAdGVzdC5jb20iLCJpYXQiOjE3MzUzNjc3MjB9.test-jwt-token',
-    user: {
-      id: '123',
-      email: req.body.email || 'test@test.com',
-      name: 'Test User',
-      role: 'admin'
-    }
-  });
-});
-
-// ============ REAL ROUTES ============
+// ============ OTHER ROUTES ============
 try {
-  const authRoutes = require('./src/routes/auth.routes');
   const transactionRoutes = require('./src/routes/transaction.routes');
-  
-  app.use('/api/auth', authRoutes);
   app.use('/api/transactions', transactionRoutes);
-  
-  console.log('Real routes loaded');
+  console.log('Transaction routes loaded');
 } catch (error) {
-  console.log('Routes error:', error.message);
+  console.log('Transaction routes error:', error.message);
 }
 
 // Error handling
@@ -99,7 +172,11 @@ app.use((err, req, res, next) => {
 
 // 404
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found', path: req.url });
+  res.status(404).json({ 
+    error: 'Endpoint not found',
+    path: req.url,
+    method: req.method
+  });
 });
 
 // Start server
@@ -107,12 +184,14 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log('\n' + '='.repeat(60));
   console.log('SERVER STARTED ON PORT ' + PORT);
-  console.log('CORS: ALL ORIGINS ALLOWED (*)');
   console.log('='.repeat(60));
+  console.log('\nLOGIN CREDENTIALS:');
+  console.log('1. admin@fraud.com / admin123');
+  console.log('2. viewer@fraud.com / viewer123');
   console.log('\nTEST ENDPOINTS:');
   console.log('1. GET  /test');
   console.log('2. GET  /api/cors-test');
-  console.log('3. POST /api/auth/test-login');
+  console.log('3. POST /api/auth/login');
   console.log('\n' + '='.repeat(60));
 });
 
